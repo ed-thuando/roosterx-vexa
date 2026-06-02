@@ -118,6 +118,22 @@ meetingApi:
   botImageName: "vexaai/vexa-bot:latest"
   transcriptionServiceUrl: ""
   transcriptionServiceToken: ""
+  # RoosterX audio-only fork — transcript collector tasks are gated off by
+  # default (meeting_api/config.py reads TRANSCRIPTION_ENABLED; meetings.py
+  # reads TRANSCRIBE_DEFAULT). Audio still records + uploads to object storage.
+  transcriptionEnabled: false
+  transcribeDefault: false
+  # RoosterX audio-only fork — S3/R2 storage knobs. Used only when
+  # storageBackend=s3 (meeting_api/storage.py reads these exact env names:
+  # S3_ENDPOINT / AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / S3_BUCKET /
+  # S3_SECURE / AWS_REGION). Default storageBackend stays "minio" (above),
+  # so empty defaults here are harmless until an operator flips to s3/R2.
+  s3Endpoint: ""
+  s3Bucket: ""
+  s3Secure: "true"
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+  awsRegion: "auto"
   minioSecure: "false"
   # v0.10.5.3 Pack D-3 follow-up (Option B): browser-reachable hostname
   # used to sign presigned download URLs. MINIO_ENDPOINT (cluster-internal)
@@ -192,7 +208,7 @@ runtimeApi:
       value: "10" 
 
 ttsService:
-  enabled: true
+  enabled: false   # RoosterX audio-only fork — voice agent stripped
   replicaCount: 1
   image:
     repository: vexaai/tts-service
@@ -226,7 +242,7 @@ ttsService:
     initialDelaySeconds: 600
 
 mcp:
-  enabled: true
+  enabled: false   # RoosterX audio-only fork — MCP server stripped (api-gateway MCP_URL optional)
   # v0.10.5.3 Pack H — bump from 1 to 2 to match other stateless services
   # (apiGateway, adminApi, meetingApi, runtimeApi, dashboard) and enable
   # zero-downtime rolling-update with the maxSurge: 1 / maxUnavailable: 0
@@ -470,8 +486,8 @@ runtimeProfiles: |
         DISPLAY: "${DISPLAY:-:99}"
         NODE_ENV: "production"
         REDIS_URL: "${REDIS_URL}"
-        TRANSCRIPTION_SERVICE_URL: "${TRANSCRIPTION_SERVICE_URL}"
-        TRANSCRIPTION_SERVICE_TOKEN: "${TRANSCRIPTION_SERVICE_TOKEN}"
+        # RoosterX audio-only fork — TRANSCRIPTION_SERVICE_URL/TOKEN removed
+        # (mirrors services/runtime-api/profiles.yaml). Bot records audio only.
         # v0.10.5 Pack B.3 — propagate recording/storage env to bot pods (#235).
         # Without these, bot transcribes (has TRANSCRIPTION_SERVICE_*) and
         # silently skips recording upload (no MEETING_API_URL → no endpoint

@@ -8,16 +8,14 @@ RUN apt-get update && apt-get install -y \
     x11-utils \
     pulseaudio \
     x11-xserver-utils \
-    fluxbox \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files and install dependencies with npm
-COPY package.json package-lock.json ./
-
-RUN npm install
+COPY package.json ./
+RUN npm install --ignore-scripts
 # Install TypeScript globally to avoid permission issues
 RUN npm install -g typescript
 # Copy the rest of the application source code
@@ -42,28 +40,35 @@ FROM mcr.microsoft.com/playwright:v1.56.0-jammy AS runtime
 # Set working directory
 WORKDIR /app
 
-# Install runtime dependencies for Xvfb, VNC, SSH, and others
+# RoosterX audio-only fork: VNC/SSH stack is opt-in (see services/vexa-bot/Dockerfile).
+# Build with --build-arg INSTALL_DEBUG_TOOLS=true for a debuggable image.
+ARG INSTALL_DEBUG_TOOLS=false
+
+# Install runtime dependencies.
+# Always: Xvfb, ffmpeg, PulseAudio, X11 utils, unzip + curl (awscli install below).
+# Debug-only: xephyr, fluxbox, x11vnc, novnc, websockify, socat, autocutsel,
+# openssh-server, sshpass — only for watching/controlling the browser.
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     xvfb \
     ffmpeg \
     pulseaudio \
-    xserver-xephyr \
     x11-utils \
     x11-xserver-utils \
-    fluxbox \
-    x11vnc \
-    socat \
-    autocutsel \
-    openssh-server \
-    sshpass \
     unzip \
     curl \
-    python3-websockify \
-    novnc \
+    && if [ "$INSTALL_DEBUG_TOOLS" = "true" ]; then \
+         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+           xserver-xephyr fluxbox x11vnc socat autocutsel openssh-server sshpass python3-websockify novnc ; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI for S3/MinIO sync (used by authenticated bot mode)
-RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
+RUN ARCH=$(uname -m) && case "$ARCH" in \
+    x86_64|amd64) AWSCLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" ;; \
+    aarch64|arm64) AWSCLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" ;; \
+    *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac \
+    && curl -fsSL "$AWSCLI_URL" -o /tmp/awscliv2.zip \
     && unzip -q /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/awscliv2.zip /tmp/aws

@@ -960,7 +960,13 @@ async def request_bot(
         meeting_data["meeting_url"] = req.meeting_url
     if req.teams_base_host:
         meeting_data["teams_base_host"] = req.teams_base_host
-    transcribe = True if req.transcribe_enabled is None else bool(req.transcribe_enabled)
+    # RoosterX audio-only fork: transcription defaults OFF. The bot then skips
+    # the per-speaker transcription pipeline (VAD, Whisper client, segment
+    # publish) and just records + uploads audio — the "run lighter" win. A
+    # caller can still opt in per-request with transcribe_enabled=true, or flip
+    # the fork-wide default via TRANSCRIBE_DEFAULT=true.
+    _transcribe_default = os.getenv("TRANSCRIBE_DEFAULT", "false").lower() == "true"
+    transcribe = _transcribe_default if req.transcribe_enabled is None else bool(req.transcribe_enabled)
     meeting_data["transcribe_enabled"] = transcribe
     if req.video:
         meeting_data["recording_enabled"] = True

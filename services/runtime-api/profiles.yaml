@@ -37,8 +37,9 @@ profiles:
       DISPLAY: "${DISPLAY:-:99}"
       NODE_ENV: "production"
       REDIS_URL: "${REDIS_URL}"
-      TRANSCRIPTION_SERVICE_URL: "${TRANSCRIPTION_SERVICE_URL}"
-      TRANSCRIPTION_SERVICE_TOKEN: "${TRANSCRIPTION_SERVICE_TOKEN}"
+      # RoosterX audio-only fork: no transcription env injected into bots.
+      # (TRANSCRIPTION_SERVICE_URL / TRANSCRIPTION_SERVICE_TOKEN removed — the
+      # bot records audio and uploads it; it never calls a transcription service.)
     ports:
       "9222/tcp": {}         # CDP debug port
 

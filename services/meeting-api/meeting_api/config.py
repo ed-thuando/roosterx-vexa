@@ -38,6 +38,14 @@ TRANSCRIPTION_COLLECTOR_URL = os.getenv(
     "http://transcription-collector:8000",
 )
 
+# RoosterX audio-only fork: transcription ingestion is OFF by default.
+# When false, meeting-api skips xgroup_create + the three supervised
+# collector tasks (db-writer, segment consumer, speaker-events consumer),
+# so the transcript pipeline never runs and the process stays lean. Audio
+# recording + upload to object storage is unaffected. Flip to "true" only
+# if you re-enable a transcription-service and want segments persisted.
+TRANSCRIPTION_ENABLED = os.getenv("TRANSCRIPTION_ENABLED", "false").lower() == "true"
+
 # Post-meeting hooks (comma-separated URLs)
 POST_MEETING_HOOKS = [
     url.strip()

@@ -1,7 +1,7 @@
 # ==============================================================================
 # Stage 1: Build native addon (Zoom SDK wrapper)
 # ==============================================================================
-FROM --platform=linux/amd64 node:20-bullseye AS native-builder
+FROM node:20-bullseye AS native-builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -42,7 +42,6 @@ RUN apt-get update && apt-get install -y \
     x11-utils \
     pulseaudio \
     x11-xserver-utils \
-    fluxbox \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace files
@@ -79,26 +78,34 @@ FROM mcr.microsoft.com/playwright:v1.56.0-jammy AS runtime
 
 WORKDIR /app/vexa-bot
 
-# Install runtime dependencies
+# RoosterX audio-only fork: the VNC/SSH/remote-control stack is opt-in.
+# Default build is lean (audio-record-only). Build with
+# --build-arg INSTALL_DEBUG_TOOLS=true to include the live-browser debug
+# stack, then run the container with ENABLE_VNC=true to start it.
+ARG INSTALL_DEBUG_TOOLS=false
+
+# Install runtime dependencies.
+# Always: Xvfb + PulseAudio (audio capture), libssl3 / libxcb-xtest0 (browser),
+# awscli (authenticated browser-userdata sync), curl + git.
+# Debug-only (INSTALL_DEBUG_TOOLS=true): xephyr, fluxbox, x11vnc, novnc,
+# websockify, socat, openssh-server — only for watching/controlling the
+# browser; not needed for headless audio recording.
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     pulseaudio \
-    xserver-xephyr \
     libssl3 \
     libxcb-xtest0 \
-    fluxbox \
-    x11vnc \
-    novnc \
-    python3-websockify \
     awscli \
-    socat \
     curl \
     git \
-    openssh-server \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /run/sshd \
-    && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    && if [ "$INSTALL_DEBUG_TOOLS" = "true" ]; then \
+         apt-get install -y --no-install-recommends \
+           xserver-xephyr fluxbox x11vnc novnc python3-websockify socat openssh-server \
+         && mkdir -p /run/sshd \
+         && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
+         && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config ; \
+       fi \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace package files (for runtime dependencies)
 COPY --from=native-builder /app/vexa-bot/package*.json ./

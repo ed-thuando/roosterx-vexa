@@ -61,6 +61,12 @@ BOT_MODE=$(echo "$BOT_CONFIG" | node -e "try{const c=JSON.parse(require('fs').re
 
 if [ "$BOT_MODE" = "browser_session" ]; then
   echo "[entrypoint] Browser session mode — starting VNC stack"
+  # browser_session needs the VNC/SSH stack, which the lean audio-only image
+  # omits. Warn (don't crash — the launches below are backgrounded) so the
+  # cause is obvious: rebuild with --build-arg INSTALL_DEBUG_TOOLS=true.
+  if ! command -v x11vnc >/dev/null 2>&1; then
+    echo "[entrypoint] WARNING: browser_session requires the debug image (INSTALL_DEBUG_TOOLS=true); VNC/SSH tools are missing in this lean image."
+  fi
   mkdir -p /root/.fluxbox
   cat > /root/.fluxbox/apps <<'FBAPPS'
 [app] (name=.*) (class=.*)
@@ -101,20 +107,28 @@ FBAPPS
   # Keep alive so VNC + websockify remain accessible
   wait
 else
-  # Meeting mode — start VNC for browser view on dashboard
-  echo "[entrypoint] Meeting mode — starting VNC for browser view"
-  mkdir -p /root/.fluxbox
-  cat > /root/.fluxbox/apps <<'FBAPPS'
+  # Meeting mode.
+  # RoosterX audio-only fork: the live-browser VNC view is opt-in. Set
+  # ENABLE_VNC=true (on an image built with INSTALL_DEBUG_TOOLS=true) to watch
+  # the browser; otherwise run headless with no VNC processes. Audio capture
+  # uses Xvfb + PulseAudio above and does not depend on VNC.
+  if [ "${ENABLE_VNC:-false}" = "true" ]; then
+    echo "[entrypoint] Meeting mode — starting VNC for browser view"
+    mkdir -p /root/.fluxbox
+    cat > /root/.fluxbox/apps <<'FBAPPS'
 [app] (name=.*) (class=.*)
   [Maximized]  {yes}
 [end]
 FBAPPS
-  fluxbox &
-  x11vnc -display :99 -forever -nopw -shared -rfbport 5900 &
-  if [ -d /usr/share/novnc ]; then
-    websockify --web /usr/share/novnc 6080 localhost:5900 &
+    fluxbox &
+    x11vnc -display :99 -forever -nopw -shared -rfbport 5900 &
+    if [ -d /usr/share/novnc ]; then
+      websockify --web /usr/share/novnc 6080 localhost:5900 &
+    else
+      websockify 6080 localhost:5900 &
+    fi
   else
-    websockify 6080 localhost:5900 &
+    echo "[entrypoint] Meeting mode — headless (ENABLE_VNC not set)"
   fi
 
   # Run the bot

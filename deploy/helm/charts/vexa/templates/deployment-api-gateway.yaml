@@ -44,8 +44,12 @@ spec:
               value: "http://{{ include "vexa.componentName" (list . "runtime-api") }}:{{ .Values.runtimeApi.service.port }}"
             - name: TRANSCRIPTION_COLLECTOR_URL
               value: "http://{{ include "vexa.componentName" (list . "meeting-api") }}:{{ .Values.meetingApi.service.port }}"
+            # RoosterX audio-only fork — MCP is optional (main.py no longer
+            # requires MCP_URL at startup). When mcp is disabled, fall back to
+            # apiGateway.mcpUrl (empty default) instead of pointing at a
+            # non-existent mcp Service. Explicit apiGateway.mcpUrl always wins.
             - name: MCP_URL
-              value: {{ default (printf "http://%s:%d" (include "vexa.componentName" (list . "mcp")) (.Values.mcp.service.port | int)) .Values.apiGateway.mcpUrl | quote }}
+              value: {{ .Values.apiGateway.mcpUrl | default (ternary (printf "http://%s:%d" (include "vexa.componentName" (list . "mcp")) (.Values.mcp.service.port | int)) "" .Values.mcp.enabled) | quote }}
             - name: REDIS_URL
               value: {{ include "vexa.redisUrl" . | quote }}
             - name: REDIS_HOST
