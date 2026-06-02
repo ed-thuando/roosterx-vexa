@@ -265,13 +265,8 @@ setup-api-key: check_docker
 			| python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null); \
 		if [ -n "$$TOKEN" ]; then \
 			echo "VEXA_API_KEY=$$TOKEN" >> $(ENV_FILE); \
-			echo "Created VEXA_API_KEY for user $$USER_ID (dashboard WS auth)."; \
-			if [ -f $(LAST_TAG_FILE) ]; then \
-				export IMAGE_TAG=$$(cat $(LAST_TAG_FILE)); \
-			else \
-				export IMAGE_TAG=dev; \
-			fi; \
-			$(COMPOSE_CMD) up -d dashboard; \
+			echo "Created VEXA_API_KEY for user $$USER_ID."; \
+			: "RoosterX audio-only fork: dashboard is not deployed, so there is no dashboard container to restart with the new key."; \
 		else \
 			echo "WARNING: Could not create API key for user $$USER_ID. Dashboard WS will require login."; \
 		fi; \
