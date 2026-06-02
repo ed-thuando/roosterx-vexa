@@ -48,6 +48,7 @@ from .collector.consumer import (
 )
 from .collector.db_writer import process_redis_to_postgres
 from .collector.endpoints import router as collector_router
+from .config import TRANSCRIPTION_ENABLED
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -330,7 +331,12 @@ async def startup():
     logger.info("Meeting-api sweeps loop started (Pack E.3.2 stale-stopping)")
 
     # --- Collector startup ---
-    if True:  # redis_client is guaranteed non-None per Pack C.4
+    # RoosterX audio-only fork: the collector (transcript ingestion) only runs
+    # when TRANSCRIPTION_ENABLED=true. Default is off, so we skip xgroup_create
+    # and the three supervised tasks entirely — the recording/upload path does
+    # not depend on them. /readyz still flips Ready below (it gates on
+    # _startup_complete, not on collector tasks being alive).
+    if TRANSCRIPTION_ENABLED:  # redis_client is guaranteed non-None per Pack C.4
         # Ensure consumer groups exist for transcription stream
         try:
             await redis_client.xgroup_create(
@@ -381,6 +387,11 @@ async def startup():
             lambda: consume_speaker_events_stream(redis_client),
         )
         logger.info(f"Speaker Events consumer task started (Stream: {REDIS_SPEAKER_EVENTS_STREAM_NAME})")
+    else:
+        logger.info(
+            "TRANSCRIPTION_ENABLED=false (RoosterX audio-only fork): collector "
+            "tasks skipped. Audio recording + upload still active."
+        )
 
     # Shared httpx client for connection pooling to Runtime API
     from .config import RUNTIME_API_TOKEN
@@ -388,10 +399,13 @@ async def startup():
     app.state.httpx_client = httpx.AsyncClient(timeout=30.0, headers=headers)
 
     # v0.10.5 Pack C.4 — flip the readiness gate.
-    # All preconditions are now satisfied:
+    # Preconditions satisfied:
     #   1. Redis ping succeeded (bounded retry above; raises if all 20 fail).
-    #   2. xgroup_create succeeded for both streams.
-    #   3. All three collector tasks spawned + supervised (Pack C.2).
+    #   2. If TRANSCRIPTION_ENABLED: xgroup_create succeeded for both streams
+    #      and all three collector tasks spawned + supervised (Pack C.2).
+    #      If disabled (RoosterX audio-only default): those steps are skipped —
+    #      the recording/upload path doesn't need them, so /readyz still goes
+    #      Ready and reports 0 collector tasks alive, which is expected.
     # /readyz now returns 200; K8s Service starts routing traffic.
     global _startup_complete
     _startup_complete = True

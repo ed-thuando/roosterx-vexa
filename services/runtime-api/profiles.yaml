@@ -37,8 +37,10 @@ profiles:
       DISPLAY: "${DISPLAY:-:99}"
       NODE_ENV: "production"
       REDIS_URL: "${REDIS_URL}"
-      TRANSCRIPTION_SERVICE_URL: "${TRANSCRIPTION_SERVICE_URL}"
-      TRANSCRIPTION_SERVICE_TOKEN: "${TRANSCRIPTION_SERVICE_TOKEN}"
+      # RoosterX audio-only fork: no transcription env injected into bots.
+      # (TRANSCRIPTION_SERVICE_URL / TRANSCRIPTION_SERVICE_TOKEN removed — the
+      # bot records audio and uploads it; it never calls a transcription service.)
+      # TTS + INTERNAL_API_SECRET kept (upstream, not transcription).
       TTS_SERVICE_URL: "${TTS_SERVICE_URL}"
       INTERNAL_API_SECRET: "${INTERNAL_API_SECRET}"
     ports:

@@ -17,10 +17,15 @@ BUILD_TAG := $(VERSION)-$(shell date +%y%m%d-%H%M)
 # DockerHub namespace
 DOCKERHUB_USER ?= vexaai
 
+# Platform override for CI multi-arch builds (e.g. DOCKER_BUILD_PLATFORM=--platform linux/amd64).
+# Default empty: Docker auto-detects the host architecture (arm64 on Apple Silicon, amd64 on Intel).
+DOCKER_BUILD_PLATFORM ?=
+
 # All images that get built and published.
-# agent-api remains NO-SHIP for v0.10.x (see docker-compose.yml); do not
-# promote a non-deployed image to :dev/:latest as part of public releases.
-IMAGES := api-gateway admin-api runtime-api meeting-api mcp dashboard tts-service vexa-lite
+# RoosterX audio-only fork: agent-api, mcp, dashboard, tts-service, and the
+# vexa-lite single-container image are not built/published (those features are
+# stripped). Only the bot-orchestration core + the bot image ship.
+IMAGES := api-gateway admin-api runtime-api meeting-api
 BOT_IMAGE := vexa-bot
 
 -include $(ENV_FILE)
@@ -153,15 +158,21 @@ check_docker:
 
 # --- Build ---
 build-bot-image: check_docker
-	@echo "Building $(DOCKERHUB_USER)/$(BOT_IMAGE):$(BUILD_TAG)..."
-	docker build --platform linux/amd64 -t $(DOCKERHUB_USER)/$(BOT_IMAGE):$(BUILD_TAG) -f $(ROOT)/services/vexa-bot/Dockerfile $(ROOT)/services/vexa-bot
+	@echo "Building $(DOCKERHUB_USER)/$(BOT_IMAGE):$(BUILD_TAG) (lean, no VNC/SSH)..."
+	docker build $(DOCKER_BUILD_PLATFORM) -t $(DOCKERHUB_USER)/$(BOT_IMAGE):$(BUILD_TAG) -f $(ROOT)/services/vexa-bot/Dockerfile $(ROOT)/services/vexa-bot
+
+# Debug bot image — includes the VNC/SSH/remote-control stack. Run the
+# resulting container with ENABLE_VNC=true to watch the browser live.
+build-bot-image-debug: check_docker
+	@echo "Building $(DOCKERHUB_USER)/$(BOT_IMAGE):$(BUILD_TAG)-debug (with VNC/SSH)..."
+	docker build $(DOCKER_BUILD_PLATFORM) --build-arg INSTALL_DEBUG_TOOLS=true -t $(DOCKERHUB_USER)/$(BOT_IMAGE):$(BUILD_TAG)-debug -f $(ROOT)/services/vexa-bot/Dockerfile $(ROOT)/services/vexa-bot
 
 build-lite: check_docker
 	@echo "Building $(DOCKERHUB_USER)/vexa-lite:$(BUILD_TAG)..."
 	@# v0.10.5.3 Pack D-1 follow-up: pass NEXT_PUBLIC_VEXA_OSS_VERSION as build-arg
 	@# so the dashboard's prebuild generator inside the lite container has a
 	@# version source. VERSION file is the canonical truth.
-	docker build --platform linux/amd64 \
+	docker build $(DOCKER_BUILD_PLATFORM) \
 		--build-arg NEXT_PUBLIC_VEXA_OSS_VERSION=$(VERSION) \
 		--build-arg NEXT_PUBLIC_VEXA_OSS_RELEASE_DATE=$(shell date +%Y-%m-%d) \
 		-t $(DOCKERHUB_USER)/vexa-lite:$(BUILD_TAG) \
@@ -171,7 +182,7 @@ build-transcript-rendering:
 	@echo "Building transcript-rendering package..."
 	@cd $(ROOT)/packages/transcript-rendering && npm install && npm run build
 
-build: check_docker build-bot-image build-transcript-rendering build-lite
+build: check_docker build-bot-image
 	@echo "Building all images with tag: $(BUILD_TAG)"
 	@# v0.10.5.3 Pack D-1 follow-up: VEXA_VERSION + VEXA_RELEASE_DATE are
 	@# read by docker-compose.yml's dashboard service `args:` block to feed

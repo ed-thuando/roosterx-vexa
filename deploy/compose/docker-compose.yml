@@ -213,10 +213,11 @@ services:
     environment:
       - ADMIN_API_URL=http://admin-api:8001
       - MEETING_API_URL=http://meeting-api:8080
+      # Transcript GET endpoints live in meeting-api in this fork; the proxy
+      # target stays valid (returns empty when transcription is disabled).
       - TRANSCRIPTION_COLLECTOR_URL=http://meeting-api:8080
-      - MCP_URL=http://mcp:18888
-      - CALENDAR_SERVICE_URL=http://calendar-service:8050
-      - AGENT_API_URL=http://agent-api:8100
+      # MCP_URL / AGENT_API_URL / CALENDAR_SERVICE_URL removed — those services
+      # are not deployed in the RoosterX audio-only fork.
       - REDIS_URL=redis://redis:6379/0
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-vexa-internal-secret}
       - RATE_LIMIT_RPM=${RATE_LIMIT_RPM:-120}
@@ -265,18 +266,29 @@ services:
       - MEETING_API_URL=http://meeting-api:8080
       - BOT_IMAGE_NAME=${BROWSER_IMAGE}
       - DOCKER_NETWORK=${COMPOSE_PROJECT_NAME:-vexa}_vexa
-      - TTS_SERVICE_URL=http://tts-service:8002
-      # agent-api is not shipped in this compose profile. Operators can opt in
-      # with POST_MEETING_HOOKS, but the default must not point at a disabled
-      # service or every completed meeting emits DNS errors before handoff.
+      # TTS_SERVICE_URL removed — tts-service is not deployed (audio-only fork).
+      # POST_MEETING_HOOKS defaults to empty (agent-api webhook removed). Set it
+      # in .env to your own completion webhook if you want post-meeting events.
       - POST_MEETING_HOOKS=${POST_MEETING_HOOKS:-}
       - TRANSCRIPTION_COLLECTOR_URL=http://meeting-api:8080
+      # Transcription ingestion off by default in this fork (see config.py).
+      - TRANSCRIPTION_ENABLED=${TRANSCRIPTION_ENABLED:-false}
+      # --- Object storage (recordings) ---
+      # Local dev defaults to the bundled MinIO. For Cloudflare R2 (or any
+      # S3-compatible store) set STORAGE_BACKEND=s3 in .env and provide the
+      # S3_* / AWS_* vars below; storage.py reads those when backend=s3.
       - STORAGE_BACKEND=${STORAGE_BACKEND:-minio}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-vexa-access-key}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-vexa-secret-key}
       - MINIO_BUCKET=${MINIO_BUCKET:-vexa}
       - MINIO_SECURE=${MINIO_SECURE:-false}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_SECURE=${S3_SECURE:-true}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-auto}
       # v0.10.5.3 Pack D-3 follow-up (Option B): browser-reachable MinIO
       # endpoint for presigned download URLs. Default falls back to the
       # internal hostname which works for in-network browsers (compose VM
@@ -326,85 +338,13 @@ services:
   #     - vexa
   #   restart: unless-stopped
 
-  mcp:
-    build:
-      context: ../..
-      dockerfile: services/mcp/Dockerfile
-    image: vexaai/mcp:${IMAGE_TAG}
-    mem_limit: 512m
-    ports:
-      - "127.0.0.1:${MCP_HOST_PORT:-18888}:18888"
-    environment:
-      - API_GATEWAY_URL=http://api-gateway:8000
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    init: true
-    depends_on:
-      - api-gateway
-    networks:
-      - vexa
-    restart: unless-stopped
-
-  dashboard:
-    build:
-      context: ../..
-      dockerfile: services/dashboard/Dockerfile
-      # Release identity guard: the dashboard Dockerfile copies VERSION and
-      # Chart.yaml into the build and rejects a stale VEXA_VERSION override.
-      # Empty VEXA_VERSION is allowed; the generator then uses VERSION.
-      args:
-        NEXT_PUBLIC_VEXA_OSS_VERSION: ${VEXA_VERSION:-}
-        NEXT_PUBLIC_VEXA_OSS_RELEASE_DATE: ${VEXA_RELEASE_DATE:-}
-        VEXA_API_URL: http://api-gateway:8000
-    image: vexaai/dashboard:${IMAGE_TAG}
-    mem_limit: 1g
-    ports:
-      - "${DASHBOARD_HOST_PORT:-3001}:3000"
-    environment:
-      - VEXA_API_URL=http://api-gateway:8000
-      - VEXA_PUBLIC_API_URL=${VEXA_PUBLIC_API_URL:-}
-      - API_GATEWAY_HOST_PORT=${API_GATEWAY_HOST_PORT:-8056}
-      - VEXA_API_KEY=${VEXA_API_KEY:-}
-      - VEXA_ADMIN_API_KEY=${ADMIN_API_TOKEN:-changeme}
-      - VEXA_ADMIN_API_URL=http://admin-api:8001
-      - JWT_SECRET=${JWT_SECRET:-vexa-dev-jwt-secret}
-      - VEXA_AUTH_COOKIE_NAME=${VEXA_AUTH_COOKIE_NAME:-vexa-token-compose}
-      - VEXA_USER_INFO_COOKIE_NAME=${VEXA_USER_INFO_COOKIE_NAME:-vexa-user-info-compose}
-      - VEXA_ALLOW_DIRECT_LOGIN=${VEXA_ALLOW_DIRECT_LOGIN:-true}
-      - MINIO_INTERNAL_ENDPOINT=${MINIO_INTERNAL_ENDPOINT:-http://minio:9000}
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-}
-    init: true
-    depends_on:
-      - api-gateway
-    networks:
-      - vexa
-    restart: unless-stopped
-
-  tts-service:
-    build:
-      context: ../..
-      dockerfile: services/tts-service/Dockerfile
-    image: vexaai/tts-service:${IMAGE_TAG}
-    mem_limit: 1g
-    expose:
-      - "8002"
-    # Host-expose TTS for pack-lane probes; override in isolated lanes.
-    # v0.10.6.1 (scope.yaml tts-auto-language-detection.code_to_change):
-    # host-expose the TTS port so host-side proves (TTS_AUTO_LANG_PICKS_RIGHT_VOICE,
-    # TTS_NEW_LANG_VOICE_AUTO_DOWNLOAD_CACHED) can curl localhost:8002.
-    ports:
-      - "127.0.0.1:${TTS_SERVICE_HOST_PORT:-8002}:8002"
-    environment:
-      - PIPER_DEFAULT_VOICES=${PIPER_DEFAULT_VOICES:-major}
-      - PIPER_LOAD_VOICES=${PIPER_LOAD_VOICES:-en_US-amy-medium,en_US-danny-low,pt_BR-faber-medium,es_ES-davefx-medium}
-      - PIPER_PRELOAD_STRICT=${PIPER_PRELOAD_STRICT:-true}
-      - TTS_API_TOKEN=${TTS_API_TOKEN:-}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    volumes:
-      - tts-voices:/app/voices
-    init: true
-    networks:
-      - vexa
-    restart: unless-stopped
+  # --- RoosterX audio-only fork: stripped services ---
+  # mcp, dashboard, and tts-service are intentionally NOT deployed in this
+  # fork (audio-record-only: no MCP, no web UI, no text-to-speech). Their
+  # source remains in services/ for optional upstream re-enablement; the
+  # api-gateway no longer requires MCP_URL, and meeting-api leaves
+  # TTS_SERVICE_URL unset. transcription-service / agent-api / calendar-service
+  # / telegram-bot were already not part of this compose file.
 
   # calendar-service: NO-SHIP for 0.10 — not included in release
   # calendar-service:
@@ -440,7 +380,6 @@ volumes:
   postgres-data:
   minio-data:
   recordings-data:
-  tts-voices:
 
 networks:
   vexa:

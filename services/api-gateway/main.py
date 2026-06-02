@@ -65,14 +65,16 @@ ROUTE_SCOPES = {
 }
 
 # --- Validation at startup ---
-if not all([ADMIN_API_URL, MEETING_API_URL, TRANSCRIPTION_COLLECTOR_URL, MCP_URL]):
+# RoosterX audio-only fork: only the bot-orchestration core is mandatory.
+# TRANSCRIPTION_COLLECTOR_URL and MCP_URL are optional here — the transcript
+# and MCP features are gated off in this fork. Routes that proxy to them fail
+# at request time when the URL is unset, instead of blocking startup.
+if not all([ADMIN_API_URL, MEETING_API_URL]):
     missing_vars = [
         var_name
         for var_name, var_value in {
             "ADMIN_API_URL": ADMIN_API_URL,
             "MEETING_API_URL": MEETING_API_URL,
-            "TRANSCRIPTION_COLLECTOR_URL": TRANSCRIPTION_COLLECTOR_URL,
-            "MCP_URL": MCP_URL,
         }.items()
         if not var_value
     ]
@@ -1375,6 +1377,8 @@ async def agent_session_delete_proxy(session_id: str, request: Request):
                dependencies=[Depends(api_key_scheme)])
 async def forward_mcp_root(request: Request):
     """Forward MCP root endpoint requests to the separate MCP service."""
+    if not MCP_URL:
+        raise HTTPException(status_code=503, detail="MCP service is not configured (disabled in the audio-only fork).")
     url = f"{MCP_URL}/mcp"
     
     # Build headers following MCP transport protocol requirements
@@ -1434,6 +1438,8 @@ async def forward_mcp_root(request: Request):
                dependencies=[Depends(api_key_scheme)])
 async def forward_mcp_path(request: Request, path: str):
     """Forward MCP path requests to the separate MCP service."""
+    if not MCP_URL:
+        raise HTTPException(status_code=503, detail="MCP service is not configured (disabled in the audio-only fork).")
     url = f"{MCP_URL}/mcp/{path}"
     
     # Same header handling as root endpoint
