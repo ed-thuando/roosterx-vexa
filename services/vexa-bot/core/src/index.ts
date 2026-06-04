@@ -1254,9 +1254,13 @@ async function initVoiceAgentServices(
  * Must be called before `startPerSpeakerAudioCapture()`.
  */
 async function initPerSpeakerPipeline(botConfig: BotConfig): Promise<boolean> {
+  // DEPRECATED in the RoosterX audio-only fork. This whole pipeline only runs
+  // when transcribeEnabled=true AND a transcription URL is provided. In the
+  // default audio-record-only path neither is set, so this returns early and
+  // the bot never calls any (hosted or self-hosted) transcription service.
   const transcriptionServiceUrl = botConfig.transcriptionServiceUrl || process.env.TRANSCRIPTION_SERVICE_URL;
   if (!transcriptionServiceUrl) {
-    log('[PerSpeaker] WARNING: transcriptionServiceUrl not in config and TRANSCRIPTION_SERVICE_URL not set. Per-speaker transcription disabled.');
+    log('[PerSpeaker] Transcription disabled (audio-only fork): no transcriptionServiceUrl / TRANSCRIPTION_SERVICE_URL. Skipping — recording audio only.');
     return false;
   }
 
