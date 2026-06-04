@@ -1,3 +1,26 @@
+# 🎙️ RoosterX — Audio-Only Recorder (fork of Vexa)
+
+**This fork focuses on ONE thing: bots join a meeting and record audio, then
+upload it to S3-compatible object storage (Cloudflare R2).**
+
+Transcription, Whisper, voice-agent, TTS, MCP, and the web dashboard are
+**deprecated / not used** here. They are gated off by default and only run if
+you explicitly opt in:
+
+- `TRANSCRIPTION_ENABLED=false` — meeting-api transcript collector is not started
+- `TRANSCRIBE_DEFAULT=false` — bots don't transcribe unless a request sets `transcribe_enabled=true`
+- the bot receives a transcription URL **only** when transcription is opted in
+- `POST /meetings/{id}/transcribe` is **DEPRECATED** — returns 503 unless you intentionally set an external `TRANSCRIPTION_SERVICE_URL`
+
+> ⚠️ To guarantee no hosted Vexa transcription API is ever called, **leave
+> `TRANSCRIPTION_SERVICE_URL` unset (remove it from your `.env`).**
+
+Deploy: [`deploy/DEPLOY-MACMINI.md`](deploy/DEPLOY-MACMINI.md) · Changes vs upstream: [`ROOSTERX_HANDOFF.md`](ROOSTERX_HANDOFF.md) §13.
+
+*Everything below is the original upstream Vexa README, kept for reference.*
+
+---
+
 <p align="center" style="margin-bottom: 0.75em;">
   <img src="assets/logodark.svg" alt="Vexa Logo" width="56"/>
 </p>

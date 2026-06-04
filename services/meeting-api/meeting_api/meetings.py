@@ -1106,9 +1106,16 @@ async def request_bot(
         "transcribeEnabled": transcribe,
         "captureModes": user_recording_config.get("capture_modes", os.getenv("CAPTURE_MODES", "audio").split(",")),
         "recordingUploadUrl": f"{MEETING_API_URL}/internal/recordings/upload",
-        "transcriptionServiceUrl": os.getenv("TRANSCRIPTION_SERVICE_URL"),
-        "transcriptionServiceToken": os.getenv("TRANSCRIPTION_SERVICE_TOKEN"),
     }
+    # DEPRECATED in the RoosterX audio-only fork: transcription is OFF and the
+    # transcription-service URL/token are only injected into the bot when a
+    # caller explicitly opts in (transcribe=true). This stops the bot from
+    # calling any (possibly hosted Vexa) transcription endpoint in the default
+    # audio-record-only path. Remove TRANSCRIPTION_SERVICE_URL from your .env to
+    # be certain it is never reached.
+    if transcribe:
+        bot_config["transcriptionServiceUrl"] = os.getenv("TRANSCRIPTION_SERVICE_URL")
+        bot_config["transcriptionServiceToken"] = os.getenv("TRANSCRIPTION_SERVICE_TOKEN")
     if req.recording_enabled is not None:
         bot_config["recordingEnabled"] = bool(req.recording_enabled)
     if req.voice_agent_enabled is not None:
@@ -1958,9 +1965,14 @@ class TranscribeResponse(BaseModel):
 
 @router.post(
     "/meetings/{meeting_id}/transcribe",
-    summary="Trigger deferred transcription for a completed meeting",
+    summary="[DEPRECATED — audio-only fork] Trigger deferred transcription",
+    description="DEPRECATED in the RoosterX audio-only fork: this fork records "
+                "audio only and does not transcribe. This endpoint is OPTIONAL and "
+                "returns 503 unless you intentionally configure an external "
+                "TRANSCRIPTION_SERVICE_URL. Not used in the default deployment.",
     response_model=TranscribeResponse,
     dependencies=[Depends(get_user_and_token)],
+    deprecated=True,
 )
 async def transcribe_meeting(
     meeting_id: int,
