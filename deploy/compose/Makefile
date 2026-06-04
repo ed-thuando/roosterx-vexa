@@ -1,4 +1,4 @@
-.PHONY: all all-build env build build-bot-image build-transcript-rendering up down ps logs test test-transcription init-db restore-db check_docker preflight publish promote-staging promote-latest help-tags setup-api-key
+.PHONY: all all-build env build build-dashboard up-dashboard build-bot-image build-transcript-rendering up down ps logs test test-transcription init-db restore-db check_docker preflight publish promote-staging promote-latest help-tags setup-api-key
 
 # --- Paths ---
 ROOT := $(shell git rev-parse --show-toplevel)
@@ -181,6 +181,20 @@ build-lite: check_docker
 build-transcript-rendering:
 	@echo "Building transcript-rendering package..."
 	@cd $(ROOT)/packages/transcript-rendering && npm install && npm run build
+
+# Dashboard (opt-in overlay; audio-only base does not run it).
+DASHBOARD_OVERLAY := $(ROOT)/deploy/compose/docker-compose.dashboard.yml
+
+build-dashboard: check_docker build-transcript-rendering
+	@echo "Building dashboard image..."
+	IMAGE_TAG=$$(cat $(LAST_TAG_FILE) 2>/dev/null || echo dev) VEXA_VERSION=$(VERSION) VEXA_RELEASE_DATE=$(shell date +%Y-%m-%d) \
+		docker compose -f $(COMPOSE_FILE) -f $(DASHBOARD_OVERLAY) --env-file $(ENV_FILE) build dashboard
+
+# Start the full stack WITH the dashboard (base + overlay).
+up-dashboard: check_docker
+	IMAGE_TAG=$$(cat $(LAST_TAG_FILE) 2>/dev/null || grep -E '^IMAGE_TAG=' $(ENV_FILE) | cut -d= -f2) \
+		docker compose -f $(COMPOSE_FILE) -f $(DASHBOARD_OVERLAY) --env-file $(ENV_FILE) up -d
+	@echo "Dashboard on http://localhost:$$(grep -E '^DASHBOARD_HOST_PORT=' $(ENV_FILE) 2>/dev/null | cut -d= -f2 || echo 3001)"
 
 build: check_docker build-bot-image
 	@echo "Building all images with tag: $(BUILD_TAG)"
