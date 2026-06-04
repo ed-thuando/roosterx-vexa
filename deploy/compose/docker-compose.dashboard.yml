@@ -1,0 +1,49 @@
+# Dashboard overlay for the RoosterX audio-only fork.
+#
+# The base docker-compose.yml is audio-only and does NOT run the dashboard.
+# This overlay adds it back on top, so you can opt in without editing the base.
+#
+# Usage (combine both files, order matters):
+#   docker compose -f docker-compose.yml -f docker-compose.dashboard.yml up -d
+#   # build the dashboard image (one-time; needs the transcript-rendering pkg):
+#   cd ../../packages/transcript-rendering && npm install && npm run build && cd -
+#   docker compose -f docker-compose.yml -f docker-compose.dashboard.yml build dashboard
+#
+# Or via the Makefile helpers: `make up-dashboard` / `make build-dashboard`.
+#
+# NOTE: the dashboard is transcript/agent-focused (upstream Vexa). In this
+# audio-only fork its transcript/chat views are inert; recordings/meetings
+# listing works. For a clean audio-only UI a thin custom page is lighter.
+#
+# Auth: set VEXA_API_KEY (client) and a real JWT_SECRET in .env, and use a
+# strong ADMIN_API_TOKEN (the dashboard talks to admin-api).
+
+name: vexa
+
+services:
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: services/dashboard/Dockerfile
+      args:
+        NEXT_PUBLIC_VEXA_OSS_VERSION: ${VEXA_VERSION:-dev}
+        NEXT_PUBLIC_VEXA_OSS_RELEASE_DATE: ${VEXA_RELEASE_DATE:-}
+    image: vexaai/dashboard:${IMAGE_TAG}
+    mem_limit: 1g
+    ports:
+      - "${DASHBOARD_HOST_PORT:-3001}:3000"
+    environment:
+      - VEXA_API_URL=http://api-gateway:8000
+      - VEXA_PUBLIC_API_URL=${VEXA_PUBLIC_API_URL:-}
+      - API_GATEWAY_HOST_PORT=${API_GATEWAY_HOST_PORT:-8056}
+      - VEXA_API_KEY=${VEXA_API_KEY:-}
+      - VEXA_ADMIN_API_KEY=${ADMIN_API_TOKEN:-changeme}
+      - VEXA_ADMIN_API_URL=http://admin-api:8001
+      - JWT_SECRET=${JWT_SECRET:-vexa-dev-jwt-secret}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-}
+    init: true
+    depends_on:
+      - api-gateway
+    networks:
+      - vexa
+    restart: unless-stopped
