@@ -88,6 +88,24 @@ expectFileContains(
   'Ask to join again',
 );
 
+expectFileContains(
+  'admission.ts exports never_admitted outcome',
+  ADMISSION_TS,
+  '"never_admitted"',
+);
+
+expectFileContains(
+  'admission.ts has classifyRejectionOutcome',
+  ADMISSION_TS,
+  'classifyRejectionOutcome',
+);
+
+expectFileContains(
+  'admission.ts has explicit deny text check',
+  ADMISSION_TS,
+  'hasExplicitDenyText',
+);
+
 console.log('\n=== Google Meet Gemini consent-gate handling (#429) ===');
 
 expectFileContains(
