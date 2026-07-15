@@ -103,8 +103,14 @@ env:
 	fi
 
 # --- Preflight — validate credentials before starting anything ---
+# RoosterX audio-only: skip transcription token prompt when TRANSCRIPTION_ENABLED=false.
 preflight:
-	@TX_URL=$$(grep -E '^TRANSCRIPTION_SERVICE_URL=' $(ENV_FILE) 2>/dev/null | cut -d= -f2); \
+	@TX_ENABLED=$$(grep -E '^TRANSCRIPTION_ENABLED=' $(ENV_FILE) 2>/dev/null | cut -d= -f2 | tr '[:upper:]' '[:lower:]'); \
+	if [ "$$TX_ENABLED" = "false" ] || [ "$$TX_ENABLED" = "0" ] || [ "$$TX_ENABLED" = "no" ]; then \
+		echo "  ✓ Audio-only mode (TRANSCRIPTION_ENABLED=false) — skipping transcription token check"; \
+		exit 0; \
+	fi; \
+	TX_URL=$$(grep -E '^TRANSCRIPTION_SERVICE_URL=' $(ENV_FILE) 2>/dev/null | cut -d= -f2); \
 	TX_TOKEN=$$(grep -E '^TRANSCRIPTION_SERVICE_TOKEN=' $(ENV_FILE) 2>/dev/null | cut -d= -f2); \
 	if [ "$$TX_TOKEN" = "ci-placeholder" ]; then \
 		echo "  CI mode: skipping transcription validation (ci-placeholder token)"; \
@@ -114,6 +120,7 @@ preflight:
 		echo ""; \
 		echo "  Vexa uses transcription.vexa.ai to process meeting audio."; \
 		echo "  If you use a different provider, edit .env and re-run make all."; \
+		echo "  Or set TRANSCRIPTION_ENABLED=false in .env for audio-only (RoosterX)."; \
 		echo ""; \
 		printf "  Press Enter to continue: "; \
 		read -r CONFIRM < /dev/tty; \
@@ -126,7 +133,7 @@ preflight:
 		if [ -z "$$TX_TOKEN" ]; then \
 			echo "  ✗ No token provided. Run 'make all' again when you have one."; exit 1; \
 		fi; \
-		sed -i "s|^TRANSCRIPTION_SERVICE_TOKEN=.*|TRANSCRIPTION_SERVICE_TOKEN=$$TX_TOKEN|" $(ENV_FILE); \
+		sed -i.bak "s|^TRANSCRIPTION_SERVICE_TOKEN=.*|TRANSCRIPTION_SERVICE_TOKEN=$$TX_TOKEN|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
 		echo "  ✓ Token saved to .env"; \
 	fi; \
 	if [ -z "$$TX_URL" ]; then \

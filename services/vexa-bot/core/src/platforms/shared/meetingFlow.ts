@@ -18,6 +18,7 @@ export type LeaveReason =
   | "removed_by_admin"
   | "left_alone_timeout"
   | "startup_alone_timeout"
+  | "inactive_no_audio_timeout"
   | "normal_completion"
   | string;
 
@@ -25,12 +26,14 @@ function generateReasonTokens(platform: string): {
   removedToken: string;
   leftAloneToken: string;
   startupAloneToken: string;
+  inactiveNoAudioToken: string;
 } {
   const platformUpper = platform.toUpperCase();
   return {
     removedToken: `${platformUpper}_BOT_REMOVED_BY_ADMIN`,
     leftAloneToken: `${platformUpper}_BOT_LEFT_ALONE_TIMEOUT`,
-    startupAloneToken: `${platformUpper}_BOT_STARTUP_ALONE_TIMEOUT`
+    startupAloneToken: `${platformUpper}_BOT_STARTUP_ALONE_TIMEOUT`,
+    inactiveNoAudioToken: `${platformUpper}_BOT_INACTIVE_NO_AUDIO_TIMEOUT`,
   };
 }
 
@@ -217,6 +220,10 @@ export async function runMeetingFlow(
         await gracefulLeaveFunction(page, 0, "startup_alone_timeout");
         return;
       }
+      if (msg === tokens.inactiveNoAudioToken || msg.includes(tokens.inactiveNoAudioToken)) {
+        await gracefulLeaveFunction(page, 0, "inactive_no_audio_timeout");
+        return;
+      }
 
       const errorDetails = {
         error_message: error?.message,
@@ -243,6 +250,10 @@ export async function runMeetingFlow(
     }
     if (msg.includes(tokens.startupAloneToken)) {
       await gracefulLeaveFunction(page, 0, "startup_alone_timeout");
+      return;
+    }
+    if (msg.includes(tokens.inactiveNoAudioToken)) {
+      await gracefulLeaveFunction(page, 0, "inactive_no_audio_timeout");
       return;
     }
 

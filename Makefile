@@ -22,6 +22,9 @@ up:                                ## start compose stack (alias for all)
 bot-debug:                         ## spawn a bot to MEET_URL in the local stack + tail logs (hot-mounted bot dist)
 	@MEET_URL="$(MEET_URL)" bash scripts/bot-debug.sh
 
+mac-auto-leave:                    ## Mac local: build/up/spawn/watch auto-leave tests (see scripts/mac-test-auto-leave.sh)
+	@bash scripts/mac-test-auto-leave.sh $(ARGS)
+
 down:                              ## stop compose stack
 	@$(MAKE) --no-print-directory -C deploy/compose down
 

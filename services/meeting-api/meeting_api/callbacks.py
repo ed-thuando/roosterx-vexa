@@ -127,6 +127,10 @@ async def _classify_stopped_exit(
     # meeting; user got their transcript. Stay COMPLETED.
     if requested_reason == MeetingCompletionReason.LEFT_ALONE:
         return (MeetingStatus.COMPLETED, requested_reason)
+    # INACTIVE_NO_AUDIO — continuous silence (no RMS) for no_audio_activity_timeout.
+    # Legitimate end; meeting had no useful audio. Stay COMPLETED.
+    if requested_reason == MeetingCompletionReason.INACTIVE_NO_AUDIO:
+        return (MeetingStatus.COMPLETED, requested_reason)
     # Only STOPPED reaches the deeper success-proof checks below.
     if requested_reason != MeetingCompletionReason.STOPPED:
         # Defensive: unknown reason. Mark FAILED rather than silent-completed.
@@ -439,6 +443,8 @@ async def bot_exit_callback(
                 "left_alone": MeetingCompletionReason.LEFT_ALONE,
                 "left_alone_timeout": MeetingCompletionReason.LEFT_ALONE,
                 "startup_alone_timeout": MeetingCompletionReason.LEFT_ALONE,
+                "inactive_no_audio": MeetingCompletionReason.INACTIVE_NO_AUDIO,
+                "inactive_no_audio_timeout": MeetingCompletionReason.INACTIVE_NO_AUDIO,
                 "meeting_ended_by_host": MeetingCompletionReason.STOPPED,
                 "normal_completion": MeetingCompletionReason.STOPPED,
                 "post_join_setup_error": MeetingCompletionReason.STOPPED,  # FM-001 — gmeet end-of-meeting nav

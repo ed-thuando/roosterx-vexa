@@ -16,7 +16,8 @@ export type BotConfig = {
   automaticLeave: {
     waitingRoomTimeout: number,
     noOneJoinedTimeout: number,
-    everyoneLeftTimeout: number
+    everyoneLeftTimeout: number,
+    noAudioActivityTimeout: number,
   },
   reconnectionIntervalMs?: number,
   meeting_id: number,  // Required, not optional

@@ -84,6 +84,32 @@ class MeetingCompletionReason(str, Enum):
     JOIN_FAILURE = "join_failure"  # Bot failed to navigate to the meeting (pre-lobby fast fail, distinct from user-stopped)
     # v0.10.6 (#421) — split lobby timeout from explicit host denial:
     NEVER_ADMITTED = "never_admitted"  # Bot waited full lobby timeout; host did not explicitly deny
+    # RoosterX auto-leave: no audio RMS activity for no_audio_activity_timeout (even if people remain)
+    INACTIVE_NO_AUDIO = "inactive_no_audio"
+
+
+# EN-only human messages for auto-leave completion reasons (Meetix surfaces these).
+COMPLETION_MESSAGES: Dict[MeetingCompletionReason, str] = {
+    MeetingCompletionReason.LEFT_ALONE: "All participants have left the meeting",
+    MeetingCompletionReason.INACTIVE_NO_AUDIO: "Meeting inactive — no audio activity",
+}
+
+
+def completion_message_for(reason: Optional[MeetingCompletionReason]) -> Optional[str]:
+    """Return the locked EN message for a completion reason, or None if none defined."""
+    if reason is None:
+        return None
+    return COMPLETION_MESSAGES.get(reason)
+
+
+# RoosterX system defaults for automatic_leave (milliseconds).
+AUTOMATIC_LEAVE_DEFAULTS_MS: Dict[str, int] = {
+    "max_bot_time": 7_200_000,           # 2h
+    "max_wait_for_admission": 900_000,   # 15 min
+    "max_time_left_alone": 600_000,      # 10 min no other participants
+    "no_one_joined_timeout": 600_000,    # 10 min nobody ever joined
+    "no_audio_activity_timeout": 600_000,  # 10 min silence / inactive
+}
 
 class MeetingFailureStage(str, Enum):
     """
@@ -403,6 +429,10 @@ class AutomaticLeave(BaseModel):
     max_wait_for_admission: Optional[int] = Field(None, description="Max time to wait for admission in ms")
     max_time_left_alone: Optional[int] = Field(None, description="Max time left alone before leaving in ms")
     no_one_joined_timeout: Optional[int] = Field(None, description="No one joined timeout in ms")
+    no_audio_activity_timeout: Optional[int] = Field(
+        None,
+        description="Max continuous silence (no audio RMS) before leaving as inactive_no_audio, in ms",
+    )
     # Old names kept as aliases for backward compatibility (D1)
     waiting_room_timeout: Optional[int] = Field(None, description="[DEPRECATED] Use max_wait_for_admission")
     everyone_left_timeout: Optional[int] = Field(None, description="[DEPRECATED] Use max_time_left_alone")

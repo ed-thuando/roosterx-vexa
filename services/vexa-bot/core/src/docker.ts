@@ -39,7 +39,8 @@ export const BotConfigSchema = z.object({
   automaticLeave: z.object({
     waitingRoomTimeout: z.number().int().default(300000),
     noOneJoinedTimeout: z.number().int().default(600000),
-    everyoneLeftTimeout: z.number().int().default(120000)
+    everyoneLeftTimeout: z.number().int().default(600000),
+    noAudioActivityTimeout: z.number().int().default(600000),
   }).default({}),
   reconnectionIntervalMs: z.number().int().optional(),
   meeting_id: z.number().int().optional(),

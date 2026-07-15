@@ -811,12 +811,20 @@ export async function startTeamsRecording(page: Page, botConfig: BotConfig): Pro
             const everyoneLeftTimeoutSeconds = leaveCfg.everyoneLeftTimeout
               ? Math.floor(Number(leaveCfg.everyoneLeftTimeout) / 1000)
               : Number(leaveCfg.everyoneLeftTimeoutSeconds ?? 60);
+            const silenceTimeoutSeconds = leaveCfg.noAudioActivityTimeout
+              ? Math.floor(Number(leaveCfg.noAudioActivityTimeout) / 1000)
+              : Number(leaveCfg.noAudioActivityTimeoutSeconds ?? (10 * 60));
 
             let aloneTime = 0;
             let lastParticipantCount = 0;
             let speakersIdentified = false;
             let hasEverHadMultipleParticipants = false;
             let monitoringStopped = false;
+
+            // Q1=A: arm silence clock at monitoring start.
+            if (!(window as any).__vexaLastAudioActivityTs) {
+              (window as any).__vexaLastAudioActivityTs = Date.now();
+            }
 
             const stopMonitoring = (
               reason: string,
@@ -873,6 +881,23 @@ export async function startTeamsRecording(page: Page, botConfig: BotConfig): Pro
                 stopMonitoring("removed_by_admin", () => reject(new Error("TEAMS_BOT_REMOVED_BY_ADMIN")));
                 return;
               }
+
+              if (silenceTimeoutSeconds > 0) {
+                const lastAudioMs = (window as any).__vexaLastAudioActivityTs || 0;
+                const silenceElapsedSec = lastAudioMs > 0
+                  ? Math.floor((Date.now() - lastAudioMs) / 1000)
+                  : silenceTimeoutSeconds;
+                if (silenceElapsedSec >= silenceTimeoutSeconds) {
+                  (window as any).logBot(
+                    `Teams inactive: no audio activity for ${silenceElapsedSec}s (limit ${silenceTimeoutSeconds}s). Leaving...`,
+                  );
+                  stopMonitoring("inactive_no_audio_timeout", () =>
+                    reject(new Error("TEAMS_BOT_INACTIVE_NO_AUDIO_TIMEOUT")),
+                  );
+                  return;
+                }
+              }
+
               const currentParticipantCount = (window as any).getTeamsActiveParticipantsCount ? (window as any).getTeamsActiveParticipantsCount() : 0;
 
               if (currentParticipantCount !== lastParticipantCount) {

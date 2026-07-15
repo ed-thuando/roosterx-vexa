@@ -15,6 +15,7 @@ export type CompletionReason =
   | "awaiting_admission_rejected"
   | "never_admitted"
   | "left_alone"
+  | "inactive_no_audio"
   | "evicted"
   | "max_bot_time_exceeded"
   // Pack D (#5): distinct pre-lobby join failure (fast fail before reaching waiting room)
@@ -260,7 +261,12 @@ export function mapExitReasonToStatus(
       case "self_initiated_leave":
         return { status: "completed", completionReason: "stopped" };
       case "left_alone":
+      case "left_alone_timeout":
+      case "startup_alone_timeout":
         return { status: "completed", completionReason: "left_alone" };
+      case "inactive_no_audio":
+      case "inactive_no_audio_timeout":
+        return { status: "completed", completionReason: "inactive_no_audio" };
       case "evicted":
         return { status: "completed", completionReason: "evicted" };
       case "removed_by_admin":

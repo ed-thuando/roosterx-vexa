@@ -132,6 +132,7 @@ def _build_meeting_event_data(meeting: Meeting) -> Dict[str, Any]:
         "status": meeting.status,
         "completion_reason": data.get("completion_reason"),
         "failure_stage": data.get("failure_stage"),
+        "message": data.get("message"),
         "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
         "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
         "data": clean_meeting_data(meeting.data),
